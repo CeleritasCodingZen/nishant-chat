@@ -69,11 +69,24 @@ body::after{
   background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,0.55) 100%);
 }
 
-/* ── CUSTOM CURSOR ─────────────────────────────────────────────────────────── */
-.cursor{position:fixed;pointer-events:none;z-index:99999;top:0;left:0;transform:translate(-50%,-50%)}
-.cur-dot{width:5px;height:5px;background:var(--green);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
-.cur-ring{width:22px;height:22px;border:1px solid var(--green);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0.6;transition:width .12s,height .12s}
-.cur-ring.big{width:40px;height:40px}
+/* ── CUSTOM CURSOR (SQUARE GSAP HUD) ───────────────────────────────────────── */
+.cursor{position:fixed;pointer-events:none;z-index:99999;top:0;left:0;transform:translate(-50%,-50%);will-change:transform}
+.cur-square{
+  width:4px;height:4px;background:var(--green);position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);box-shadow:0 0 4px var(--green);
+  transition:width .16s cubic-bezier(0.16,1,0.3,1),height .16s cubic-bezier(0.16,1,0.3,1),background .12s;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.cur-square.expanded{
+  width:42px;height:42px;background:rgba(10,11,13,0.92);
+  border:1px solid var(--green);box-shadow:0 0 10px rgba(57,255,20,0.35),2px 2px 0 #000;
+}
+.cur-label{
+  font-family:var(--jb);font-size:8px;font-weight:700;color:var(--green);
+  letter-spacing:0.1em;opacity:0;transition:opacity .1s ease;user-select:none;text-align:center;line-height:1;
+}
+.cur-square.expanded .cur-label{opacity:1}
+@media(pointer:coarse){.cursor{display:none!important}}
 
 /* ── SCROLLBAR ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar{width:3px}
@@ -218,6 +231,14 @@ body::after{
   box-shadow:0 0 12px rgba(57,255,20,0.15),4px 4px 0 #000;
   position:relative;overflow:hidden;
 }
+.crt-beam{
+  position:absolute;inset:0;background:var(--green);
+  box-shadow:0 0 30px var(--green);z-index:20;
+  pointer-events:none;transform-origin:center;opacity:0;
+}
+.crt-content{
+  position:relative;z-index:2;height:100%;display:flex;flex-direction:column;justify-content:space-between;
+}
 .crt::before{
   content:"";position:absolute;inset:0;pointer-events:none;
   background:repeating-linear-gradient(
@@ -254,11 +275,64 @@ body::after{
   background:var(--cart);border:1px solid var(--border);
   box-shadow:4px 4px 0 #000;
   display:flex;flex-direction:column;justify-content:space-between;
-  transition:transform .12s,border-color .12s,box-shadow .12s;
-  cursor:pointer;position:relative;
+  transition:transform .2s cubic-bezier(0.2, 0, 0, 1),border-color .15s,box-shadow .2s;
+  cursor:pointer;position:relative;overflow:hidden;
 }
-.cartridge:hover{transform:translate(-2px,-4px);box-shadow:6px 8px 0 #000}
-.cartridge.active{border-color:var(--green);box-shadow:4px 4px 0 var(--green)}
+.cartridge::after{
+  content:"";position:absolute;top:0;left:0;right:0;height:16px;
+  background:linear-gradient(180deg,transparent,rgba(57,255,20,0.35),transparent);
+  opacity:0;pointer-events:none;z-index:15;
+}
+.cartridge:hover::after{
+  opacity:1;animation:cartScan .6s ease-out forwards;
+}
+@keyframes cartScan{
+  0%{transform:translateY(-20px)}
+  100%{transform:translateY(380px)}
+}
+.cartridge.active{border-color:var(--green)!important;box-shadow:0 0 12px rgba(57,255,20,0.25),4px 4px 0 var(--green)!important}
+
+/* ── GLITCH SLICE EFFECT ─────────────────────────────────────────────────── */
+.glitch-slice{position:relative;display:inline-block}
+.glitch-slice.glitch-active::before,
+.glitch-slice.glitch-active::after{
+  content:attr(data-text);
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  pointer-events:none;user-select:none;
+}
+.glitch-slice.glitch-active::before{
+  color:var(--green);
+  clip-path:polygon(0 0, 100% 0, 100% 45%, 0 45%);
+  transform:translate(-4px, -1px);
+  opacity:0.85;
+}
+.glitch-slice.glitch-active::after{
+  color:var(--yellow);
+  clip-path:polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+  transform:translate(3px, 2px);
+  opacity:0.85;
+}
+
+/* ── SCROLL PROGRESS HUD ─────────────────────────────────────────────────── */
+.scroll-hud{
+  position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:800;
+  background:rgba(10,11,13,0.92);border:1px solid var(--border);
+  padding:8px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-family:var(--jb);font-size:8px;letter-spacing:0.12em;box-shadow:3px 3px 0 #000;
+  pointer-events:auto;backdrop-filter:blur(2px);
+}
+.scroll-hud-title{color:var(--muted);font-size:7px;letter-spacing:0.16em;margin-bottom:2px}
+.scroll-hud-btn{
+  background:none;border:1px solid transparent;color:var(--muted);cursor:pointer;
+  padding:2px 4px;font-family:var(--jb);font-size:8px;letter-spacing:0.1em;
+  transition:all .12s;display:block;width:100%;text-align:center;
+}
+.scroll-hud-btn:hover{color:var(--green);border-color:var(--border)}
+.scroll-hud-btn.active{
+  color:#000!important;background:var(--green)!important;font-weight:700;
+  box-shadow:0 0 6px var(--green);border-color:var(--green);
+}
+@media(max-width:900px){.scroll-hud{display:none}}
 
 /* ── THERMAL RECEIPT ───────────────────────────────────────────────────────── */
 .receipt{background:#F3F1EC;color:#0A0B0D;font-family:var(--jb);font-size:9px;line-height:1.4}

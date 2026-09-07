@@ -1,0 +1,781 @@
+"use client";
+
+import React, { useState } from "react";
+import { apiClient } from "@/lib/api-client";
+import { Barcode } from "@/components/ui/Barcode";
+import { TopQuote } from "@/types/api";
+
+interface MatchConfigLobbyProps {
+  chatLore: {
+    title: string;
+    participants: string[];
+    topQuotes: TopQuote[];
+    rawText: string;
+  };
+  activeRoom: any | null;
+  playerId: string;
+  playerName: string;
+  onPlayerNameChange: (name: string) => void;
+  onRoomCreatedOrJoined: (room: any) => void;
+  onStartMatch: () => void;
+  playClickSound: () => void;
+}
+
+const MODES = [
+  {
+    id: "ROM // 001: WHO SAID IT?",
+    title: "ROM 001 // WHO SAID IT?",
+    desc: "Direct attribution: Identify who authored real archived group chat quotes.",
+    badge: "CANON LORE",
+  },
+  {
+    id: "ROM // 002: MEMORY BANK",
+    title: "ROM 002 // MEMORY BANK",
+    desc: "Chronological recall: Remember when key moments and lore unfolded.",
+    badge: "CHRONOLOGY",
+  },
+  {
+    id: "ROM // 003: FRIENDSHIP QUIZ",
+    title: "ROM 003 // FRIENDSHIP QUIZ",
+    desc: "Behavior & affinity prediction: Test who knows whose habits the best.",
+    badge: "DYNAMICS",
+  },
+  {
+    id: "ROM // 004: HOT TAKE MACHINE",
+    title: "ROM 004 // HOT TAKE MACHINE",
+    desc: "Spiciest opinions: Unpack the most controversial takes in the chat history.",
+    badge: "CHAOS DIALOG",
+  },
+  {
+    id: "ROM // 005: CHAOS MODE",
+    title: "ROM 005 // CHAOS MODE",
+    desc: "Rapid-fire unfiltered trivia with zero mercy and dynamic curveballs.",
+    badge: "UNFILTERED",
+  },
+];
+
+export const MatchConfigLobby: React.FC<MatchConfigLobbyProps> = ({
+  chatLore,
+  activeRoom,
+  playerId,
+  playerName,
+  onPlayerNameChange,
+  onRoomCreatedOrJoined,
+  onStartMatch,
+  playClickSound,
+}) => {
+  const [tab, setTab] = useState<"host" | "join">("host");
+  const [roundCount, setRoundCount] = useState<number>(5);
+  const [selectedMode, setSelectedMode] = useState<string>("ROM // 001: WHO SAID IT?");
+  const [targetPlayers, setTargetPlayers] = useState<number>(4);
+  const [timeLimitSeconds, setTimeLimitSeconds] = useState<number>(15);
+  const [joinCodeInput, setJoinCodeInput] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+
+  const isHost = activeRoom ? activeRoom.hostId === playerId : tab === "host";
+
+  // Host creates a room
+  const handleCreateRoom = async () => {
+    if (!playerName.trim()) {
+      setErrorMessage("Please enter your player nickname first.");
+      return;
+    }
+    setErrorMessage(null);
+    setIsProcessing(true);
+    playClickSound();
+
+    try {
+      const room = await apiClient.createRoom(playerId, playerName.trim(), {
+        roundCount,
+        mode: selectedMode,
+        targetPlayers,
+        timeLimitSeconds,
+        chatTitle: chatLore.title,
+        participants: chatLore.participants,
+        topQuotes: chatLore.topQuotes,
+      });
+      onRoomCreatedOrJoined(room);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.message || "Failed to create multiplayer room.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Player joins an existing room
+  const handleJoinRoom = async () => {
+    if (!playerName.trim()) {
+      setErrorMessage("Please enter your player nickname first.");
+      return;
+    }
+    if (!joinCodeInput.trim()) {
+      setErrorMessage("Please enter a valid 8-character Room Code (e.g. VYBZ-4829).");
+      return;
+    }
+    setErrorMessage(null);
+    setIsProcessing(true);
+    playClickSound();
+
+    try {
+      const room = await apiClient.joinRoom(
+        joinCodeInput.trim(),
+        playerId,
+        playerName.trim()
+      );
+      onRoomCreatedOrJoined(room);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.message || "Failed to join room. Verify the code.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Copy shareable join link
+  const handleCopyLink = () => {
+    playClickSound();
+    if (!activeRoom) return;
+    const shareUrl = `${window.location.origin}/?room=${encodeURIComponent(
+      activeRoom.code
+    )}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  return (
+    <section
+      id="section-lobby"
+      style={{
+        borderBottom: "1px solid var(--border)",
+        background: "var(--void)",
+        padding: "54px 0",
+      }}
+    >
+      <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 24px" }}>
+        {/* Section Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            borderBottom: "1px solid var(--border)",
+            paddingBottom: 16,
+            marginBottom: 32,
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <div>
+            <div
+              className="jb"
+              style={{
+                fontSize: 10,
+                color: "var(--yellow)",
+                letterSpacing: "0.15em",
+                marginBottom: 6,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span className="led led-y pulse-y" />
+              STEP 02 // MULTIPLAYER HOSTING & GAME SETUP
+            </div>
+            <h2
+              className="sg"
+              style={{
+                fontSize: "clamp(28px, 4vw, 42px)",
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
+                color: "var(--txt)",
+                lineHeight: 1.1,
+                margin: 0,
+              }}
+            >
+              {activeRoom
+                ? `ROOM LOBBY: ${activeRoom.code}`
+                : "CONFIGURE RULES & HOST DEVICES."}
+            </h2>
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <span className="jb" style={{ fontSize: 9, color: "var(--muted)" }}>
+              SYNCHRONIZED ROOM ENGINE // ALL DEVICES CONNECTED
+            </span>
+            <Barcode val="LOBBY-DISPATCH" h={18} color="var(--muted)" />
+          </div>
+        </div>
+
+        {/* Global Nickname Picker (Required before hosting or joining) */}
+        <div
+          style={{
+            background: "#080A0D",
+            border: "1px solid var(--border)",
+            padding: "16px 20px",
+            marginBottom: 28,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <span className="jb" style={{ fontSize: 11, color: "var(--green)", fontWeight: 700 }}>
+              YOUR PLAYER NAME:
+            </span>
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => onPlayerNameChange(e.target.value)}
+              placeholder="Enter your name (e.g. Nishant)"
+              style={{
+                background: "var(--void)",
+                border: "1px solid var(--border)",
+                color: "var(--txt)",
+                fontFamily: "var(--jb)",
+                fontSize: 13,
+                padding: "8px 14px",
+                minWidth: 240,
+                outline: "none",
+              }}
+            />
+          </div>
+          <div className="jb" style={{ fontSize: 10, color: "var(--muted)" }}>
+            Tip: Pick a name from your group chat to see your custom lore persona!
+          </div>
+        </div>
+
+        {/* If Not in Active Room: Show Host vs Join Setup */}
+        {!activeRoom ? (
+          <div>
+            {/* Host / Join Tabs */}
+            <div style={{ display: "flex", gap: 4, marginBottom: 24 }}>
+              <button
+                onClick={() => {
+                  playClickSound();
+                  setTab("host");
+                }}
+                style={{
+                  background: tab === "host" ? "var(--chassis)" : "transparent",
+                  border: `1px solid ${tab === "host" ? "var(--green)" : "var(--border)"}`,
+                  color: tab === "host" ? "var(--green)" : "var(--muted)",
+                  fontFamily: "var(--jb)",
+                  fontSize: 11,
+                  padding: "10px 24px",
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                  fontWeight: tab === "host" ? 700 : 400,
+                }}
+              >
+                ● HOST A NEW ROOM
+              </button>
+              <button
+                onClick={() => {
+                  playClickSound();
+                  setTab("join");
+                }}
+                style={{
+                  background: tab === "join" ? "var(--chassis)" : "transparent",
+                  border: `1px solid ${tab === "join" ? "var(--yellow)" : "var(--border)"}`,
+                  color: tab === "join" ? "var(--yellow)" : "var(--muted)",
+                  fontFamily: "var(--jb)",
+                  fontSize: 11,
+                  padding: "10px 24px",
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                  fontWeight: tab === "join" ? 700 : 400,
+                }}
+              >
+                ● JOIN WITH ROOM CODE
+              </button>
+            </div>
+
+            {errorMessage && (
+              <div
+                style={{
+                  background: "rgba(255,51,75,0.08)",
+                  border: "1px solid var(--red)",
+                  color: "var(--red)",
+                  fontFamily: "var(--jb)",
+                  fontSize: 11,
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
+
+            {tab === "host" ? (
+              /* HOST CONFIGURATION PANEL */
+              <div
+                style={{
+                  background: "var(--chassis)",
+                  border: "1px solid var(--border)",
+                  padding: "28px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                  gap: 28,
+                }}
+              >
+                {/* 1. Number of Rounds */}
+                <div>
+                  <div
+                    className="jb"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--green)",
+                      letterSpacing: "0.1em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    1. NUMBER OF ROUNDS
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[3, 5, 7, 10].map((rounds) => (
+                      <button
+                        key={rounds}
+                        onClick={() => {
+                          playClickSound();
+                          setRoundCount(rounds);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "12px 0",
+                          background: roundCount === rounds ? "var(--green)" : "var(--void)",
+                          color: roundCount === rounds ? "#000" : "var(--txt)",
+                          border: `1px solid ${roundCount === rounds ? "var(--green)" : "var(--border)"}`,
+                          fontFamily: "var(--jb)",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {rounds}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="jb" style={{ fontSize: 9, color: "var(--muted)", marginTop: 6 }}>
+                    Standard tournament: 5 rounds
+                  </div>
+                </div>
+
+                {/* 2. Time Limit Per Question */}
+                <div>
+                  <div
+                    className="jb"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--green)",
+                      letterSpacing: "0.1em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    2. TIME LIMIT PER QUESTION
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[10, 15, 20, 30].map((sec) => (
+                      <button
+                        key={sec}
+                        onClick={() => {
+                          playClickSound();
+                          setTimeLimitSeconds(sec);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "12px 0",
+                          background: timeLimitSeconds === sec ? "var(--yellow)" : "var(--void)",
+                          color: timeLimitSeconds === sec ? "#000" : "var(--txt)",
+                          border: `1px solid ${timeLimitSeconds === sec ? "var(--yellow)" : "var(--border)"}`,
+                          fontFamily: "var(--jb)",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {sec}s
+                      </button>
+                    ))}
+                  </div>
+                  <div className="jb" style={{ fontSize: 9, color: "var(--muted)", marginTop: 6 }}>
+                    Faster answers yield +250 speed bonus points
+                  </div>
+                </div>
+
+                {/* 3. Number of Target Players */}
+                <div>
+                  <div
+                    className="jb"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--green)",
+                      letterSpacing: "0.1em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    3. EXPECTED PLAYERS
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[1, 2, 4, 6, 8].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => {
+                          playClickSound();
+                          setTargetPlayers(count);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "12px 0",
+                          background: targetPlayers === count ? "rgba(255,255,255,0.15)" : "var(--void)",
+                          color: "var(--txt)",
+                          border: `1px solid ${targetPlayers === count ? "var(--txt)" : "var(--border)"}`,
+                          fontFamily: "var(--jb)",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {count === 1 ? "SOLO" : `${count}P`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="jb" style={{ fontSize: 9, color: "var(--muted)", marginTop: 6 }}>
+                    Any device with the link can join
+                  </div>
+                </div>
+
+                {/* 4. Game Mode Selection (Full Width) */}
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div
+                    className="jb"
+                    style={{
+                      fontSize: 10,
+                      color: "var(--green)",
+                      letterSpacing: "0.1em",
+                      marginBottom: 8,
+                    }}
+                  >
+                    4. SELECT ARCADE GAME MODE
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {MODES.map((mode) => {
+                      const isSelected = selectedMode === mode.id;
+                      return (
+                        <button
+                          key={mode.id}
+                          onClick={() => {
+                            playClickSound();
+                            setSelectedMode(mode.id);
+                          }}
+                          style={{
+                            background: isSelected ? "rgba(57,255,20,0.08)" : "var(--void)",
+                            border: `1px solid ${isSelected ? "var(--green)" : "var(--border)"}`,
+                            padding: "12px 14px",
+                            textAlign: "left",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div
+                            className="jb"
+                            style={{
+                              fontSize: 9,
+                              color: isSelected ? "var(--green)" : "var(--muted)",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {mode.badge}
+                          </div>
+                          <div
+                            className="sg"
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              color: isSelected ? "var(--txt)" : "#AAA",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {mode.title}
+                          </div>
+                          <div className="jb" style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.3 }}>
+                            {mode.desc}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Create Room Button */}
+                <div style={{ gridColumn: "1 / -1", marginTop: 8 }}>
+                  <button
+                    onClick={handleCreateRoom}
+                    disabled={isProcessing}
+                    className="btn-green"
+                    style={{
+                      width: "100%",
+                      padding: "16px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      cursor: isProcessing ? "wait" : "pointer",
+                    }}
+                  >
+                    {isProcessing ? "INITIALIZING MULTIPLAYER ROOM..." : "GENERATE MULTIPLAYER ROOM CODE →"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* JOIN ROOM PANEL */
+              <div
+                style={{
+                  background: "var(--chassis)",
+                  border: "1px solid var(--border)",
+                  padding: "36px 28px",
+                  maxWidth: 600,
+                }}
+              >
+                <div
+                  className="jb"
+                  style={{
+                    fontSize: 11,
+                    color: "var(--yellow)",
+                    letterSpacing: "0.1em",
+                    marginBottom: 12,
+                  }}
+                >
+                  ENTER 8-CHARACTER ROOM CODE
+                </div>
+                <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                  <input
+                    type="text"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    placeholder="E.G. VYBZ-4920"
+                    style={{
+                      flex: 1,
+                      background: "var(--void)",
+                      border: "1px solid var(--border)",
+                      color: "var(--yellow)",
+                      fontFamily: "var(--jb)",
+                      fontSize: 18,
+                      fontWeight: 700,
+                      letterSpacing: "0.15em",
+                      padding: "12px 18px",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={handleJoinRoom}
+                    disabled={isProcessing}
+                    className="btn-green"
+                    style={{
+                      padding: "0 28px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      letterSpacing: "0.1em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {isProcessing ? "CONNECTING..." : "ENTER ROOM →"}
+                  </button>
+                </div>
+                <p className="jb" style={{ fontSize: 10, color: "var(--muted)", margin: 0 }}>
+                  Enter the code displayed on the host device. Both devices must be on the same network or connected to the server.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* ACTIVE ROOM LOBBY ROSTER & START CONTROLS */
+          <div
+            style={{
+              background: "var(--chassis)",
+              border: "1px solid var(--border)",
+              padding: "28px",
+            }}
+          >
+            {/* Room Banner & Share Link */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 20,
+                borderBottom: "1px solid var(--border)",
+                paddingBottom: 20,
+                marginBottom: 24,
+              }}
+            >
+              <div>
+                <div className="jb" style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.1em" }}>
+                  SHARE THIS CODE WITH PLAYERS ON ANY DEVICE:
+                </div>
+                <div
+                  className="jb"
+                  style={{
+                    fontSize: 42,
+                    fontWeight: 800,
+                    color: "var(--green)",
+                    letterSpacing: "0.1em",
+                  }}
+                >
+                  {activeRoom.code}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <button
+                  onClick={handleCopyLink}
+                  className="btn-ghost"
+                  style={{
+                    fontSize: 11,
+                    padding: "10px 18px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {copiedLink ? "✔ LINK COPIED!" : "COPY DIRECT GAME LINK"}
+                </button>
+                <div
+                  className="jb"
+                  style={{
+                    fontSize: 11,
+                    background: "rgba(57,255,20,0.06)",
+                    border: "1px solid var(--green)",
+                    color: "var(--green)",
+                    padding: "10px 16px",
+                  }}
+                >
+                  {activeRoom.settings.roundCount} ROUNDS • {activeRoom.settings.timeLimitSeconds}S TIMER
+                </div>
+              </div>
+            </div>
+
+            {/* Connected Devices Roster */}
+            <div style={{ marginBottom: 28 }}>
+              <div
+                className="jb"
+                style={{
+                  fontSize: 10,
+                  color: "var(--muted)",
+                  letterSpacing: "0.1em",
+                  marginBottom: 12,
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span>CONNECTED PLAYERS ({activeRoom.players.length})</span>
+                <span>STATUS: {activeRoom.status}</span>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {activeRoom.players.map((p: any) => (
+                  <div
+                    key={p.id}
+                    style={{
+                      background: p.id === playerId ? "rgba(57,255,20,0.05)" : "var(--void)",
+                      border: `1px solid ${p.id === playerId ? "var(--green)" : "var(--border)"}`,
+                      padding: "14px 16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span className="jb" style={{ fontSize: 9, color: "var(--muted)" }}>
+                        {p.isHost ? "★ HOST" : "PLAYER"}
+                      </span>
+                      <span className="led led-g pulse-g" />
+                    </div>
+                    <div
+                      className="sg"
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 700,
+                        color: "var(--txt)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {p.name} {p.id === playerId && "(YOU)"}
+                    </div>
+                    <div className="jb" style={{ fontSize: 9, color: "var(--yellow)" }}>
+                      {p.tag}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Match Launch or Waiting for Host */}
+            <div>
+              {isHost ? (
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    onStartMatch();
+                  }}
+                  className="btn-green"
+                  style={{
+                    width: "100%",
+                    padding: "18px 24px",
+                    fontSize: 14,
+                    fontWeight: 800,
+                    letterSpacing: "0.15em",
+                    cursor: "pointer",
+                  }}
+                >
+                  START MATCH ON ALL CONNECTED DEVICES →
+                </button>
+              ) : (
+                <div
+                  style={{
+                    background: "rgba(255,208,0,0.06)",
+                    border: "1px solid var(--yellow)",
+                    padding: "16px 20px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    className="jb"
+                    style={{
+                      fontSize: 12,
+                      color: "var(--yellow)",
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <span className="led led-y pulse-y" />
+                    CONNECTED TO HOST // WAITING FOR HOST TO START ROUND 01...
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};

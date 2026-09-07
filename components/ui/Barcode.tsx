@@ -2,33 +2,40 @@
 
 import React from "react";
 
-interface BarcodeProps {
+export interface BarcodeProps {
   value?: string;
+  val?: string;
   className?: string;
   height?: number;
+  h?: number;
   showText?: boolean;
   color?: string;
 }
 
 export const Barcode: React.FC<BarcodeProps> = ({
-  value = "VYBZ-8849-01",
+  value,
+  val,
   className = "",
-  height = 24,
-  showText = true,
+  height,
+  h,
+  showText = false,
   color = "currentColor",
 }) => {
+  const actualValue = val || value || "VYBZ-8849-01";
+  const actualHeight = h || height || 18;
+
   // Generate deterministic pseudo bar patterns based on string chars
   const bars = React.useMemo(() => {
     const pattern: number[] = [];
-    for (let i = 0; i < value.length; i++) {
-      const code = value.charCodeAt(i);
+    for (let i = 0; i < actualValue.length; i++) {
+      const code = actualValue.charCodeAt(i);
       pattern.push((code % 3) + 1);
       pattern.push(((code >> 1) % 2) + 1);
       pattern.push(((code >> 2) % 3) + 1);
       pattern.push(1); // space
     }
     return pattern;
-  }, [value]);
+  }, [actualValue]);
 
   const totalWidth = bars.reduce((acc, w) => acc + w, 0);
 
@@ -38,11 +45,11 @@ export const Barcode: React.FC<BarcodeProps> = ({
     <div className={`inline-flex flex-col items-center select-none ${className}`}>
       <svg
         width={totalWidth}
-        height={height}
-        viewBox={`0 0 ${totalWidth} ${height}`}
+        height={actualHeight}
+        viewBox={`0 0 ${totalWidth} ${actualHeight}`}
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="block"
+        className="block flex-shrink-0"
       >
         {bars.map((width, idx) => {
           const x = currentX;
@@ -54,8 +61,8 @@ export const Barcode: React.FC<BarcodeProps> = ({
               key={idx}
               x={x}
               y={0}
-              width={width - 0.2}
-              height={height}
+              width={Math.max(0.5, width - 0.2)}
+              height={actualHeight}
               fill={color}
             />
           );
@@ -66,7 +73,7 @@ export const Barcode: React.FC<BarcodeProps> = ({
           className="font-mono text-[8px] tracking-[0.16em] uppercase mt-1 opacity-80"
           style={{ color }}
         >
-          {value}
+          {actualValue}
         </span>
       )}
     </div>
